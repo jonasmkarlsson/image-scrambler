@@ -95,32 +95,30 @@ public class Launcher {
         // Find each parameter...
         boolean image = commandLine.hasOption(Constants.OPTIONS_IMAGE[0]) || commandLine.hasOption(Constants.OPTIONS_IMAGE[1]);
         boolean version = commandLine.hasOption(Constants.OPTIONS_VERSION[0]) || commandLine.hasOption(Constants.OPTIONS_VERSION[1]);
+        boolean flipV = commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[1]);
+        boolean flipH = commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[1]);
+        boolean grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
+
+        boolean puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
+
+        int puzzleRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+        int puzzleCols = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+        if (puzzle) {
+            String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
+            if (puzzleOptionValues.length > 0) {
+                puzzleCols = Integer.valueOf(puzzleOptionValues[0]);
+            }
+
+            if (puzzleOptionValues.length > 1) {
+                puzzleRows = Integer.valueOf(puzzleOptionValues[1]);
+            }
+        }
 
         if (version || !image) {
             printHelp(constructGnuOptions(), 120, "Help GNU", "End of GNU Help", 5, 3, true);
         } else {
-            boolean flipV = commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[1]);
-            boolean flipH = commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[1]);
-            boolean grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
-
-            boolean puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
-            int puzzleRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
-            int puzzleCols = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
-
             // Fetch image to scramble...
             Path path = FileSystems.getDefault().getPath(checkCommandLineForOption(Constants.OPTIONS_IMAGE, commandLine));
-
-            if (puzzle) {
-                String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
-                if (puzzleOptionValues.length > 0) {
-                    puzzleCols = Integer.valueOf(puzzleOptionValues[0]);
-                }
-
-                if (puzzleOptionValues.length > 1) {
-                    puzzleRows = Integer.valueOf(puzzleOptionValues[1]);
-                }
-            }
-
             scramble(path, flipV, flipH, grey, puzzle, puzzleCols, puzzleRows);
         }
     }
