@@ -35,6 +35,7 @@ public class Launcher {
 
     // What to do...
     private boolean flipV = false;
+    private boolean flipH = false;
     private boolean grey = false;
     private boolean image = false;
     private boolean puzzle = false;
@@ -99,6 +100,7 @@ public class Launcher {
     private void useGnuParser(final CommandLine commandLine) throws IOException {
         // Find each parameter...
         this.flipV = commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[1]);
+        this.flipH = commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[1]);
         this.grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
         this.image = commandLine.hasOption(Constants.OPTIONS_IMAGE[0]) || commandLine.hasOption(Constants.OPTIONS_IMAGE[1]);
         this.puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
@@ -111,35 +113,44 @@ public class Launcher {
             imagePath = FileSystems.getDefault().getPath(checkCommandLineForOption(Constants.OPTIONS_IMAGE, commandLine));
 
             if (puzzle) {
-                String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
-                if (puzzleOptionValues.length > 0) {
-                    this.puzzleCols = Integer.valueOf(puzzleOptionValues[0]);
-                }
-
-                if (puzzleOptionValues.length > 1) {
-                    this.puzzleRows = Integer.valueOf(puzzleOptionValues[1]);
-                }
+                setPuzzleOptions(commandLine);
             }
+
             LOGGER.info("Attempting to scrambling image '" + imagePath.toAbsolutePath() + "'");
             scramble(imagePath);
         }
     }
 
+    private void setPuzzleOptions(CommandLine commandLine) {
+        String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
+        if (puzzleOptionValues.length > 0) {
+            this.puzzleCols = Integer.valueOf(puzzleOptionValues[0]);
+        }
+
+        if (puzzleOptionValues.length > 1) {
+            this.puzzleRows = Integer.valueOf(puzzleOptionValues[1]);
+        }
+    }
+
     private void scramble(final Path path) {
         try {
-            BufferedImage image = ImageIO.read(path.toFile());
+            BufferedImage imageToScramble = ImageIO.read(path.toFile());
             if (flipV) {
-                image = this.flipVertically(image);
+                imageToScramble = this.flipVertically(imageToScramble);
+            }
+
+            if (flipH) {
+                imageToScramble = this.flipHorizontally(imageToScramble);
             }
 
             if (grey) {
-                image = gray(image);
+                imageToScramble = gray(imageToScramble);
             }
 
             if (puzzle) {
-                image = puzzle(image, puzzleRows, puzzleCols);
+                imageToScramble = puzzle(imageToScramble, puzzleRows, puzzleCols);
             }
-            save(image, path);
+            save(imageToScramble, path);
         } catch (IOException e) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Error reading image " + path + ".", e);
@@ -156,7 +167,7 @@ public class Launcher {
         int chunkHeight = image.getHeight() / rows;
 
         // Image array to hold image chunks
-        BufferedImage imageCells[] = new BufferedImage[chunks];
+        BufferedImage[] imageCells = new BufferedImage[chunks];
         for (int x = 0; x < cols; x++) {
             for (int y = 0; y < rows; y++) {
                 // Initialize the image array with image chunks
@@ -199,6 +210,10 @@ public class Launcher {
             fileNameExtra = fileNameExtra + "-" + Constants.OPTIONS_FLIP_VERTICALLY[1];
         }
 
+        if (flipH) {
+            fileNameExtra = fileNameExtra + "-" + Constants.OPTIONS_FLIP_HORIZONTALLY[1];
+        }
+
         if (grey) {
             fileNameExtra = fileNameExtra + "-" + Constants.OPTIONS_GREY[1];
         }
@@ -231,12 +246,11 @@ public class Launcher {
      * @return
      * @throws IOException
      */
-    private BufferedImage flipVertically(BufferedImage image) throws IOException {
+    private BufferedImage flipVertically(final BufferedImage image) throws IOException {
         AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
         tx.translate(0, -image.getHeight(null));
         AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-        image = op.filter(image, null);
-        return image;
+        return op.filter(image, null);
     }
 
     /**
@@ -246,13 +260,12 @@ public class Launcher {
      * @return
      * @throws IOException
      */
-    private BufferedImage flipHorizontally(BufferedImage image) throws IOException {
+    private BufferedImage flipHorizontally(final BufferedImage image) throws IOException {
         AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
         tx = AffineTransform.getScaleInstance(-1, 1);
         tx.translate(-image.getWidth(null), 0);
         AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-        image = op.filter(image, null);
-        return image;
+        return op.filter(image, null);
     }
 
     /**
@@ -344,27 +357,6 @@ public class Launcher {
         String returnValue = checkCommandLineForOption(validOptions, commandLine);
         return "".equals(returnValue) ? defaultValue : returnValue;
     }
-
-    // /**
-    // * Checks the command line after the valid options. If not found, returns the default value.
-    // *
-    // * @param validOptions the valid options for choosing option.
-    // * @param commandLine the commandLine
-    // * @param defaultValue the default value
-    // * @return the value from the valid option and if not found the default value.
-    // */
-    // private int checkCommandLineForOption(final String[] validOptions, final CommandLine commandLine, final int defaultValue) {
-    // int returnValue = defaultValue;
-    // String stringValue = checkCommandLineForOption(validOptions, commandLine);
-    // try {
-    // returnValue = Integer.parseInt(stringValue);
-    // } catch (NumberFormatException nfe) {
-    // if (LOGGER.isDebugEnabled()) {
-    // LOGGER.debug("Could not convert value '" + stringValue + "' to an int. Using default value '" + defaultValue + "'.");
-    // }
-    // }
-    // return returnValue;
-    // }
 
     /**
      * Checks the command line after options.
