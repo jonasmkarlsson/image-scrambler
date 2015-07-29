@@ -95,34 +95,60 @@ public class Launcher {
         // Find each parameter...
         boolean image = commandLine.hasOption(Constants.OPTIONS_IMAGE[0]) || commandLine.hasOption(Constants.OPTIONS_IMAGE[1]);
         boolean version = commandLine.hasOption(Constants.OPTIONS_VERSION[0]) || commandLine.hasOption(Constants.OPTIONS_VERSION[1]);
-        boolean flipV = commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[1]);
-        boolean flipH = commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[1]);
-        boolean grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
-
-        boolean puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
-
-        int puzzleRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
-        int puzzleCols = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
-        if (puzzle) {
-            String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
-            if (puzzleOptionValues.length > 0) {
-                puzzleCols = Integer.valueOf(puzzleOptionValues[0]);
-            }
-
-            if (puzzleOptionValues.length > 1) {
-                puzzleRows = Integer.valueOf(puzzleOptionValues[1]);
-            }
-        }
 
         if (version || !image) {
             printHelp(constructGnuOptions(), 120, "Help GNU", "End of GNU Help", 5, 3, true);
         } else {
+            boolean flipV = commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[1]);
+            boolean flipH = commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[1]);
+            boolean grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
+            boolean puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
+
+            int puzzleRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+            int puzzleCols = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+
+            if (puzzle) {
+                int[] puzzleOptions = getPuzzleOptions(commandLine);
+                puzzleCols = puzzleOptions[0];
+                puzzleRows = puzzleOptions[1];
+            }
+
             // Fetch image to scramble...
             Path path = FileSystems.getDefault().getPath(checkCommandLineForOption(Constants.OPTIONS_IMAGE, commandLine));
             scramble(path, flipV, flipH, grey, puzzle, puzzleCols, puzzleRows);
         }
     }
 
+    /**
+     * Gets the values for columns and rows when for puzzle.
+     * 
+     * @param commandLine the commandLine
+     * @return Column value at index 0, rows value at index 1.
+     */
+    private int[] getPuzzleOptions(CommandLine commandLine) {
+        String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
+        int[] puzzleOptionsInt = { Constants.DEFAULT_PUZZLE_COLUMNS_ROWS, Constants.DEFAULT_PUZZLE_COLUMNS_ROWS };
+        if (puzzleOptionValues.length > 0) {
+            puzzleOptionsInt[0] = Integer.valueOf(puzzleOptionValues[0]);
+        }
+
+        if (puzzleOptionValues.length > 1) {
+            puzzleOptionsInt[1] = Integer.valueOf(puzzleOptionValues[1]);
+        }
+        return puzzleOptionsInt;
+    }
+
+    /**
+     * Scramble the image accordingly to parameters
+     * 
+     * @param path the path to the image to scramble.
+     * @param flipV if flip vertical should be done.
+     * @param flipH if flip horizontal should be done.
+     * @param grey if making the image grey should be done.
+     * @param puzzle if making a puzzle of the image should be done.
+     * @param puzzleCols number of columns for puzzle.
+     * @param puzzleRows number of rows for puzzle.
+     */
     private void scramble(final Path path, final boolean flipV, final boolean flipH, final boolean grey, final boolean puzzle, final int puzzleCols, final int puzzleRows) {
         try {
             LOGGER.info("Attempting to scrambling path '" + path.toAbsolutePath() + "'");
