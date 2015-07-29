@@ -33,22 +33,31 @@ public class Launcher {
 
     private Random rand = new Random();
 
-    // What to do...
-    private boolean flipV = false;
-    private boolean flipH = false;
-    private boolean grey = false;
-    private boolean image = false;
-    private boolean puzzle = false;
-    private boolean version = false;
-    private int puzzleRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
-    private int puzzleCols = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
-    private Path imagePath;
-
     public Launcher() {
         super();
         properties = readProperties();
         application = properties.getProperty(Constants.PROPERTY_APPLICATION);
         command = properties.getProperty(Constants.PROPERTY_COMMAND);
+    }
+
+    /**
+     * Read properties file
+     * 
+     * @return
+     */
+    @SuppressWarnings("all")
+    private Properties readProperties() {
+        Properties prop = new Properties();
+        InputStream stream = this.getClass().getResourceAsStream(Constants.PROPERTY_FILE);
+        try {
+            prop.load(stream);
+        } catch (IOException e) {
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Encountered exception while reading property file '" + Constants.PROPERTY_FILE + "':", e);
+            }
+            LOGGER.info("Encountered exception while reading property file '" + Constants.PROPERTY_FILE + "'. See log file for more information.");
+        }
+        return prop;
     }
 
     /**
@@ -76,21 +85,6 @@ public class Launcher {
         }
     }
 
-    @SuppressWarnings("all")
-    private Properties readProperties() {
-        Properties prop = new Properties();
-        InputStream stream = this.getClass().getResourceAsStream(Constants.PROPERTY_FILE);
-        try {
-            prop.load(stream);
-        } catch (IOException e) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Encountered exception while reading property file '" + Constants.PROPERTY_FILE + "':", e);
-            }
-            LOGGER.info("Encountered exception while reading property file '" + Constants.PROPERTY_FILE + "'. See log file for more information.");
-        }
-        return prop;
-    }
-
     /**
      * Parse the command line and execute the action.
      * 
@@ -99,58 +93,68 @@ public class Launcher {
      */
     private void useGnuParser(final CommandLine commandLine) throws IOException {
         // Find each parameter...
-        this.flipV = commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[1]);
-        this.flipH = commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[1]);
-        this.grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
-        this.image = commandLine.hasOption(Constants.OPTIONS_IMAGE[0]) || commandLine.hasOption(Constants.OPTIONS_IMAGE[1]);
-        this.puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
-        this.version = commandLine.hasOption(Constants.OPTIONS_VERSION[0]) || commandLine.hasOption(Constants.OPTIONS_VERSION[1]);
+        boolean image = commandLine.hasOption(Constants.OPTIONS_IMAGE[0]) || commandLine.hasOption(Constants.OPTIONS_IMAGE[1]);
+        boolean version = commandLine.hasOption(Constants.OPTIONS_VERSION[0]) || commandLine.hasOption(Constants.OPTIONS_VERSION[1]);
 
-        if (this.version || !this.image) {
-            printOutOptions(commandLine);
+        if (version || !image) {
+            printHelp(constructGnuOptions(), 120, "Help GNU", "End of GNU Help", 5, 3, true);
         } else {
+            boolean flipV = commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[1]);
+            boolean flipH = commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[1]);
+            boolean grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
+
+            boolean puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
+            int puzzleRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+            int puzzleCols = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+
             // Fetch image to scramble...
-            imagePath = FileSystems.getDefault().getPath(checkCommandLineForOption(Constants.OPTIONS_IMAGE, commandLine));
+            Path path = FileSystems.getDefault().getPath(checkCommandLineForOption(Constants.OPTIONS_IMAGE, commandLine));
 
             if (puzzle) {
-                setPuzzleOptions(commandLine);
+                String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
+                if (puzzleOptionValues.length > 0) {
+                    puzzleCols = Integer.valueOf(puzzleOptionValues[0]);
+                }
+
+                if (puzzleOptionValues.length > 1) {
+                    puzzleRows = Integer.valueOf(puzzleOptionValues[1]);
+                }
             }
 
-            LOGGER.info("Attempting to scrambling image '" + imagePath.toAbsolutePath() + "'");
-            scramble(imagePath);
+            scramble(path, flipV, flipH, grey, puzzle, puzzleCols, puzzleRows);
         }
     }
 
-    private void setPuzzleOptions(CommandLine commandLine) {
-        String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
-        if (puzzleOptionValues.length > 0) {
-            this.puzzleCols = Integer.valueOf(puzzleOptionValues[0]);
-        }
-
-        if (puzzleOptionValues.length > 1) {
-            this.puzzleRows = Integer.valueOf(puzzleOptionValues[1]);
-        }
-    }
-
-    private void scramble(final Path path) {
+    private void scramble(final Path path, final boolean flipV, final boolean flipH, final boolean grey, final boolean puzzle, final int puzzleCols, final int puzzleRows) {
         try {
-            BufferedImage imageToScramble = ImageIO.read(path.toFile());
+            LOGGER.info("Attempting to scrambling path '" + path.toAbsolutePath() + "'");
+            BufferedImage image = ImageIO.read(path.toFile());
+            String newFileName = getFileName(path);
+
             if (flipV) {
-                imageToScramble = this.flipVertically(imageToScramble);
+                image = this.flipVertically(image);
+                newFileName = newFileName + "-" + Constants.OPTIONS_FLIP_VERTICALLY[1];
             }
 
             if (flipH) {
-                imageToScramble = this.flipHorizontally(imageToScramble);
+                image = this.flipHorizontally(image);
+                newFileName = newFileName + "-" + Constants.OPTIONS_FLIP_HORIZONTALLY[1];
             }
 
             if (grey) {
-                imageToScramble = gray(imageToScramble);
+                image = gray(image);
+                newFileName = newFileName + "-" + Constants.OPTIONS_GREY[1];
             }
 
             if (puzzle) {
-                imageToScramble = puzzle(imageToScramble, puzzleRows, puzzleCols);
+                image = puzzle(image, puzzleCols, puzzleRows);
+                newFileName = newFileName + "-" + Constants.OPTIONS_PUZZLE[1];
             }
-            save(imageToScramble, path);
+
+            String ext = this.getExtension(path);
+            newFileName = newFileName + "." + ext;
+            LOGGER.info("Saving scrambled file as '" + newFileName + "'");
+            ImageIO.write(image, ext, new File(newFileName));
         } catch (IOException e) {
             if (LOGGER.isDebugEnabled()) {
                 LOGGER.debug("Error reading image " + path + ".", e);
@@ -158,7 +162,100 @@ public class Launcher {
         }
     }
 
-    private BufferedImage puzzle(final BufferedImage image, final int rows, final int cols) throws IOException {
+    /**
+     * Get the filename of a path, aka. remove the last characters after the '.' character.
+     * 
+     * @param path the path
+     * @return String only containing the filename.
+     */
+    private String getFileName(final Path path) {
+        String filename = path.getFileName().toString();
+        int indexOfExtension = filename.lastIndexOf('.');
+        return filename.substring(0, indexOfExtension);
+    }
+
+    /**
+     * Get the extension of a path, aka. remove characters before the '.' character.
+     * 
+     * @param path the path
+     * @return String only containing the extension.
+     */
+    private String getExtension(final Path path) {
+        String filename = path.getFileName().toString();
+        int index = filename.lastIndexOf('.');
+        return filename.substring(index + 1);
+    }
+
+    /**
+     * Makes the current image look gray scale (though still represented as RGB).
+     * 
+     * @throws IOException
+     */
+    private BufferedImage gray(final BufferedImage image) throws IOException {
+        // Nested loop over every pixel
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                // Get current color; set each channel to luminosity
+                Color color = new Color(image.getRGB(x, y));
+                int gray = luminosity(color.getRed(), color.getGreen(), color.getBlue());
+                // Put new color
+                Color newColor = new Color(gray, gray, gray);
+                image.setRGB(x, y, newColor.getRGB());
+            }
+        }
+        return image;
+    }
+
+    /**
+     * Computes the luminosity of an rgb value by one standard formula.
+     *
+     * @param r red value (0-255)
+     * @param g green value (0-255)
+     * @param b blue value (0-255)
+     * @return luminosity (0-255)
+     */
+    private int luminosity(int r, int g, int b) {
+        return (int) (0.299 * r + 0.587 * g + 0.114 * b);
+    }
+
+    /**
+     * Flips the image horizontally (left right).
+     * 
+     * @param image
+     * @return
+     * @throws IOException
+     */
+    private BufferedImage flipHorizontally(final BufferedImage image) throws IOException {
+        AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
+        tx = AffineTransform.getScaleInstance(-1, 1);
+        tx.translate(-image.getWidth(null), 0);
+        AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
+        return op.filter(image, null);
+    }
+
+    /**
+     * Flips the image vertically (upside down).
+     * 
+     * @param image
+     * @return
+     * @throws IOException
+     */
+    private BufferedImage flipVertically(final BufferedImage image) throws IOException {
+        AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
+        tx.translate(0, -image.getHeight(null));
+        AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
+        return op.filter(image, null);
+    }
+
+    /**
+     * 
+     * @param image
+     * @param rows
+     * @param cols
+     * @return
+     * @throws IOException
+     */
+    private BufferedImage puzzle(final BufferedImage image, final int cols, final int rows) throws IOException {
         int chunks = rows * cols;
         int count = 0;
 
@@ -201,112 +298,6 @@ public class Launcher {
         }
 
         return finalImage;
-    }
-
-    private void save(final BufferedImage image, final Path path) throws IOException {
-        String fileNameExtra = getFileName(path);
-
-        if (flipV) {
-            fileNameExtra = fileNameExtra + "-" + Constants.OPTIONS_FLIP_VERTICALLY[1];
-        }
-
-        if (flipH) {
-            fileNameExtra = fileNameExtra + "-" + Constants.OPTIONS_FLIP_HORIZONTALLY[1];
-        }
-
-        if (grey) {
-            fileNameExtra = fileNameExtra + "-" + Constants.OPTIONS_GREY[1];
-        }
-
-        if (puzzle) {
-            fileNameExtra = fileNameExtra + "-" + Constants.OPTIONS_PUZZLE[1];
-        }
-        String ext = getExtension(path);
-        fileNameExtra = fileNameExtra + "." + ext;
-        LOGGER.info("Saving scrambled file as '" + fileNameExtra + "'");
-        ImageIO.write(image, ext, new File(fileNameExtra));
-    }
-
-    private String getFileName(final Path path) {
-        String filename = path.getFileName().toString();
-        int indexOfExtension = filename.lastIndexOf('.');
-        return filename.substring(0, indexOfExtension);
-    }
-
-    private String getExtension(final Path path) {
-        String filename = path.getFileName().toString();
-        int index = filename.lastIndexOf('.');
-        return filename.substring(index + 1);
-    }
-
-    /**
-     * Flips the image vertically (upside down).
-     * 
-     * @param image
-     * @return
-     * @throws IOException
-     */
-    private BufferedImage flipVertically(final BufferedImage image) throws IOException {
-        AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
-        tx.translate(0, -image.getHeight(null));
-        AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-        return op.filter(image, null);
-    }
-
-    /**
-     * Flips the image horizontally (left right).
-     * 
-     * @param image
-     * @return
-     * @throws IOException
-     */
-    private BufferedImage flipHorizontally(final BufferedImage image) throws IOException {
-        AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
-        tx = AffineTransform.getScaleInstance(-1, 1);
-        tx.translate(-image.getWidth(null), 0);
-        AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-        return op.filter(image, null);
-    }
-
-    /**
-     * Makes the current image look gray scale (though still represented as RGB).
-     * 
-     * @throws IOException
-     */
-    private BufferedImage gray(BufferedImage image) throws IOException {
-        // Nested loop over every pixel
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                // Get current color; set each channel to luminosity
-                Color color = new Color(image.getRGB(x, y));
-                int gray = luminosity(color.getRed(), color.getGreen(), color.getBlue());
-                // Put new color
-                Color newColor = new Color(gray, gray, gray);
-                image.setRGB(x, y, newColor.getRGB());
-            }
-        }
-        return image;
-    }
-
-    /**
-     * Computes the luminosity of an rgb value by one standard formula.
-     *
-     * @param r red value (0-255)
-     * @param g green value (0-255)
-     * @param b blue value (0-255)
-     * @return luminosity (0-255)
-     */
-    private int luminosity(int r, int g, int b) {
-        return (int) (0.299 * r + 0.587 * g + 0.114 * b);
-    }
-
-    @SuppressWarnings("all")
-    private void printOutOptions(CommandLine commandLine) {
-        if (commandLine.hasOption(Constants.OPTIONS_VERSION[0]) || commandLine.hasOption(Constants.OPTIONS_VERSION[1])) {
-            System.out.println(application);
-        } else {
-            printHelp(constructGnuOptions(), 120, "Help GNU", "End of GNU Help", 5, 3, true);
-        }
     }
 
     /**
@@ -401,14 +392,18 @@ public class Launcher {
      * @see java.util.Random#nextInt(int)
      */
     private int randInt(final int min, final int max) {
-        // nextInt is normally exclusive of the top value,
-        // so add 1 to make it inclusive
+        // nextInt is normally exclusive of the top value, so add 1 to make it inclusive
         return rand.nextInt((max - min) + 1) + min;
     }
 
+    /**
+     * Returns a pseudo-random number between zero (0) and max, inclusive. Parameter max can be at most <code>Integer.MAX_VALUE - 1</code>.
+     * 
+     * @param max Maximum value. Must be greater than zero (0).
+     * @return Integer between zero (0) and max, inclusive.
+     * @see #randInt(int, int)
+     */
     private int randInt(final int max) {
-        // nextInt is normally exclusive of the top value,
-        // so add 1 to make it inclusive
         return randInt(0, max);
     }
 
