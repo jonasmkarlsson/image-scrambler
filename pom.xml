@@ -91,7 +91,7 @@
 					<archive>
 						<manifest>
 							<addClasspath>true</addClasspath>
-							<mainClass>se.jmkit.imagescrambler.cli.Main</mainClass>
+							<mainClass>org.jonasmkarlsson.imagescrambler.Main</mainClass>
 						</manifest>
 					</archive>
 					<descriptorRefs>
