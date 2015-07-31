@@ -23,8 +23,8 @@ public class LauncherTest extends AbstractCliTest {
     }
 
     @Test
-    public void testRunWithImageFileDoesNotExcists() {
-        // @formatter:off∫
+    public void testRunWithImageFileDoesNotExists() {
+        // @formatter:off
         String[] args = { 
                 "-" + Constants.OPTIONS_IMAGE[0], "THIS_IMAGE_DOES_NOT_EXISTS.JPG",
                 "-" + Constants.OPTIONS_GREY[0]};
@@ -48,18 +48,29 @@ public class LauncherTest extends AbstractCliTest {
     }
 
     @Test
-    public void testPuzzle() {
+    public void testPuzzleWithDefaultColumnsAndRows() {
         // @formatter:off
         String[] args = { 
                 "-" + Constants.OPTIONS_IMAGE[0], IMAGE_PATH,
-                "-" + Constants.OPTIONS_PUZZLE[0], "5,15"};
+                "-" + Constants.OPTIONS_PUZZLE[0]};
         // @formatter:on
         new Launcher().run(args);
         assertTrue(fileExists(IMAGE_FILENAME + "-" + Constants.OPTIONS_PUZZLE[1] + IMAGE_EXT));
     }
 
     @Test
-    public void testFlip() {
+    public void testPuzzleWithColumnsAndRowsValues() {
+        // @formatter:off
+        String[] args = { 
+                "-" + Constants.OPTIONS_IMAGE[0], IMAGE_PATH,
+                "-" + Constants.OPTIONS_PUZZLE[0], "10,7"};
+        // @formatter:on
+        new Launcher().run(args);
+        assertTrue(fileExists(IMAGE_FILENAME + "-" + Constants.OPTIONS_PUZZLE[1] + IMAGE_EXT));
+    }
+
+    @Test
+    public void testFlipVertically() {
         // @formatter:off
         String[] args = { 
                 "-" + Constants.OPTIONS_IMAGE[0], IMAGE_PATH,
@@ -67,6 +78,17 @@ public class LauncherTest extends AbstractCliTest {
         // @formatter:on
         new Launcher().run(args);
         assertTrue(fileExists(IMAGE_FILENAME + "-" + Constants.OPTIONS_FLIP_VERTICALLY[1] + IMAGE_EXT));
+    }
+
+    @Test
+    public void testFlipHorizontelly() {
+        // @formatter:off
+        String[] args = { 
+                "-" + Constants.OPTIONS_IMAGE[0], IMAGE_PATH,
+                "-" + Constants.OPTIONS_FLIP_HORIZONTALLY[0]};
+        // @formatter:on
+        new Launcher().run(args);
+        assertTrue(fileExists(IMAGE_FILENAME + "-" + Constants.OPTIONS_FLIP_HORIZONTALLY[1] + IMAGE_EXT));
     }
 
     @Test

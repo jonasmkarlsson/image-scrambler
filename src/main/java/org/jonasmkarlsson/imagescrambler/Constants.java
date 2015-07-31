@@ -1,5 +1,8 @@
 package org.jonasmkarlsson.imagescrambler;
 
+/**
+ * Contains global constants used within the image-scrambler application.
+ */
 public class Constants {
 
     // Properties settings...
@@ -24,7 +27,7 @@ public class Constants {
     // Help section...
     public static final String HELP_FLIP_VERTICALLY = "Flipes image vertically (upside down).";
     public static final String HELP_FLIP_HORIZONTALLY = "Flipes image horizontally (left right).";
-    public static final String HELP_GRAY = "Make image grey-isch.";
+    public static final String HELP_GRAY = "Make image grey-isch (black & white).";
     public static final String HELP_IMAGE = "Image to scramble.";
     public static final String HELP_PUZZLE = "Puzzles image.";
     public static final String HELP_VERSION = "Display version information.";

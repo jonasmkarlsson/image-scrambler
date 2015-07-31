@@ -6,7 +6,7 @@
 	<packaging>jar</packaging>
 
 	<name>Image Scrambler</name>
-	<description>Re-arrange and scramble a picture in different ways.</description>
+	<description>Scramble a picture in different ways.</description>
 	<organization>
 		<name>Jonas M Karlsson, Sweden</name>
 	</organization>

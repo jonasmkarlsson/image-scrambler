@@ -1,9 +1,5 @@
 package org.jonasmkarlsson.imagescrambler;
 
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.geom.AffineTransform;
-import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
@@ -12,7 +8,6 @@ import java.io.PrintWriter;
 import java.nio.file.FileSystems;
 import java.nio.file.Path;
 import java.util.Properties;
-import java.util.Random;
 
 import javax.imageio.ImageIO;
 
@@ -24,6 +19,12 @@ import org.apache.commons.cli.Options;
 import org.apache.commons.cli.ParseException;
 import org.apache.log4j.Logger;
 
+/**
+ * Scrambles an image
+ * 
+ * @author jonasmkarlsson
+ *
+ */
 public class Launcher {
     private static final Logger LOGGER = Logger.getLogger(Launcher.class);
 
@@ -31,31 +32,26 @@ public class Launcher {
     private final String application;
     private final String command;
 
-    private Random rand = new Random();
-
     public Launcher() {
         super();
-        properties = readProperties();
+        properties = readPropertiesFile(Constants.PROPERTY_FILE);
         application = properties.getProperty(Constants.PROPERTY_APPLICATION);
         command = properties.getProperty(Constants.PROPERTY_COMMAND);
     }
 
     /**
-     * Read properties file
+     * Read the properties file for the application.
      * 
      * @return
      */
-    @SuppressWarnings("all")
-    private Properties readProperties() {
+    private Properties readPropertiesFile(final String name) {
         Properties prop = new Properties();
-        InputStream stream = this.getClass().getResourceAsStream(Constants.PROPERTY_FILE);
+        InputStream stream = this.getClass().getResourceAsStream(name);
         try {
             prop.load(stream);
         } catch (IOException e) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Encountered exception while reading property file '" + Constants.PROPERTY_FILE + "':", e);
-            }
-            LOGGER.info("Encountered exception while reading property file '" + Constants.PROPERTY_FILE + "'. See log file for more information.");
+            LOGGER.error("Encountered exception while reading property file '" + name + "'. Some features might not work correctley.");
+            LOGGER.error("Exception: " + e);
         }
         return prop;
     }
@@ -73,23 +69,19 @@ public class Launcher {
             CommandLine commandLine = cmdLineGnuParser.parse(gnuOptions, commandLineArguments);
             useGnuParser(commandLine);
         } catch (ParseException parseException) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Encountered exception while parsing using GnuParser:", parseException);
-            }
             System.out.println("Encountered exception while parsing using GnuParser: " + parseException.getMessage());
+            LOGGER.error("Encountered exception while parsing using GnuParser:", parseException);
         } catch (IOException ioException) {
-            if (LOGGER.isDebugEnabled()) {
-                LOGGER.debug("Encountered IO exception while trying to read file: ", ioException);
-            }
             System.out.println("Encountered IO exception while trying to read file: " + ioException.getMessage());
+            LOGGER.error("Encountered IO exception while trying to read file: ", ioException);
         }
     }
 
     /**
      * Parse the command line and execute the action.
      * 
-     * @param commandLine
-     * @throws IOException
+     * @param commandLine the commandLine
+     * @throws IOException if image file can't not be found.
      */
     private void useGnuParser(final CommandLine commandLine) throws IOException {
         // Find each parameter...
@@ -99,101 +91,50 @@ public class Launcher {
         boolean grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
         boolean puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
 
-        int puzzleRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
-        int puzzleCols = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+        int numberOfColumns = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+        int numberOfRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
 
         if (puzzle) {
-            int[] puzzleOptions = getPuzzleOptions(commandLine);
-            puzzleCols = puzzleOptions[0];
-            puzzleRows = puzzleOptions[1];
+            String defaultNumberOfColumnsAndRows = numberOfColumns + "," + numberOfRows;
+            String numberOfColumnsAndRows = getOptionValue(Constants.OPTIONS_PUZZLE, commandLine, defaultNumberOfColumnsAndRows);
+            String[] columnsAndRows = numberOfColumnsAndRows.split(",");
+            numberOfColumns = Integer.valueOf(columnsAndRows[0]);
+            numberOfRows = Integer.valueOf(columnsAndRows[1]);
         }
 
-        Path path = FileSystems.getDefault().getPath(checkCommandLineForOption(Constants.OPTIONS_IMAGE, commandLine));
+        Path path = FileSystems.getDefault().getPath(getOptionValue(Constants.OPTIONS_IMAGE, commandLine, ""));
         if (image) {
-            scramble(path, flipV, flipH, grey, puzzle, puzzleCols, puzzleRows);
+            LOGGER.info("Scrambling path: '" + path.toAbsolutePath() + "'");
+            BufferedImage scrambledImage = new Scramble().scramble(path, flipV, flipH, grey, puzzle, numberOfColumns, numberOfRows);
+
+            String ext = getExtension(path);
+            String name = createFileName(path, flipV, flipH, grey, puzzle) + "." + ext;
+            LOGGER.info("Saving scrambled file: '" + name + "'");
+            ImageIO.write(scrambledImage, ext, new File(name));
         } else {
             printOutOptions(commandLine);
         }
     }
 
-    /**
-     * 
-     * @param commandLine
-     */
-    @SuppressWarnings("all")
-    private void printOutOptions(CommandLine commandLine) {
-        if (commandLine.hasOption(Constants.OPTIONS_VERSION[0]) || commandLine.hasOption(Constants.OPTIONS_VERSION[1])) {
-            System.out.println(application);
-        } else {
-            printHelp(constructGnuOptions(), 120, "Help GNU", "End of GNU Help", 5, 3, true);
-        }
-    }
-
-    /**
-     * Gets the values for columns and rows when for puzzle.
-     * 
-     * @param commandLine the commandLine
-     * @return Column value at index 0, rows value at index 1.
-     */
-    private int[] getPuzzleOptions(CommandLine commandLine) {
-        String[] puzzleOptionValues = checkCommandLineForOptions(Constants.OPTIONS_PUZZLE, commandLine, Constants.DEFAULT_PUZZLE_DELIMITER);
-        int[] puzzleOptionsInt = { Constants.DEFAULT_PUZZLE_COLUMNS_ROWS, Constants.DEFAULT_PUZZLE_COLUMNS_ROWS };
-        if (puzzleOptionValues.length > 0) {
-            puzzleOptionsInt[0] = Integer.valueOf(puzzleOptionValues[0]);
-        }
-
-        if (puzzleOptionValues.length > 1) {
-            puzzleOptionsInt[1] = Integer.valueOf(puzzleOptionValues[1]);
-        }
-        return puzzleOptionsInt;
-    }
-
-    /**
-     * Scramble the image accordingly to parameters
-     * 
-     * @param path the path to the image to scramble.
-     * @param flipV if flip vertical should be done.
-     * @param flipH if flip horizontal should be done.
-     * @param grey if making the image grey should be done.
-     * @param puzzle if making a puzzle of the image should be done.
-     * @param puzzleCols number of columns for puzzle.
-     * @param puzzleRows number of rows for puzzle.
-     * @throws IOException
-     */
-    private void scramble(final Path path, final boolean flipV, final boolean flipH, final boolean grey, final boolean puzzle, final int puzzleCols, final int puzzleRows)
-            throws IOException {
-        LOGGER.info("Attempting to scrambling path '" + path.toAbsolutePath() + "'");
-        BufferedImage image = ImageIO.read(path.toFile());
-        String newFileName = getFileName(path);
-
+    private String createFileName(final Path path, final boolean flipV, final boolean flipH, final boolean grey, final boolean puzzle) {
+        String fileName = getFileName(path);
         if (flipV) {
-            image = this.flipVertically(image);
-            newFileName = newFileName + "-" + Constants.OPTIONS_FLIP_VERTICALLY[1];
+            fileName = fileName + "-" + Constants.OPTIONS_FLIP_VERTICALLY[1];
         }
-
         if (flipH) {
-            image = this.flipHorizontally(image);
-            newFileName = newFileName + "-" + Constants.OPTIONS_FLIP_HORIZONTALLY[1];
+            fileName = fileName + "-" + Constants.OPTIONS_FLIP_HORIZONTALLY[1];
         }
-
         if (grey) {
-            image = gray(image);
-            newFileName = newFileName + "-" + Constants.OPTIONS_GREY[1];
+            fileName = fileName + "-" + Constants.OPTIONS_GREY[1];
         }
-
         if (puzzle) {
-            image = puzzle(image, puzzleCols, puzzleRows);
-            newFileName = newFileName + "-" + Constants.OPTIONS_PUZZLE[1];
+            fileName = fileName + "-" + Constants.OPTIONS_PUZZLE[1];
         }
-
-        String ext = this.getExtension(path);
-        newFileName = newFileName + "." + ext;
-        LOGGER.info("Saving scrambled file as '" + newFileName + "'");
-        ImageIO.write(image, ext, new File(newFileName));
+        return fileName;
     }
 
     /**
-     * Get the filename of a path, aka. remove the last characters after the '.' character.
+     * Get the filename of a path, aka. remove characters after the '.' character.
      * 
      * @param path the path
      * @return String only containing the filename.
@@ -217,117 +158,16 @@ public class Launcher {
     }
 
     /**
-     * Makes the current image look gray scale (though still represented as RGB).
      * 
-     * @throws IOException
+     * @param commandLine
      */
-    private BufferedImage gray(final BufferedImage image) throws IOException {
-        // Nested loop over every pixel
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                // Get current color; set each channel to luminosity
-                Color color = new Color(image.getRGB(x, y));
-                int gray = luminosity(color.getRed(), color.getGreen(), color.getBlue());
-                // Put new color
-                Color newColor = new Color(gray, gray, gray);
-                image.setRGB(x, y, newColor.getRGB());
-            }
+    @SuppressWarnings("all")
+    private void printOutOptions(CommandLine commandLine) {
+        if (commandLine.hasOption(Constants.OPTIONS_VERSION[0]) || commandLine.hasOption(Constants.OPTIONS_VERSION[1])) {
+            System.out.println(application);
+        } else {
+            printHelp(constructGnuOptions(), 120, "Help GNU", "End of GNU Help", 5, 3, true);
         }
-        return image;
-    }
-
-    /**
-     * Computes the luminosity of an rgb value by one standard formula.
-     *
-     * @param r red value (0-255)
-     * @param g green value (0-255)
-     * @param b blue value (0-255)
-     * @return luminosity (0-255)
-     */
-    private int luminosity(int r, int g, int b) {
-        return (int) (0.299 * r + 0.587 * g + 0.114 * b);
-    }
-
-    /**
-     * Flips the image horizontally (left right).
-     * 
-     * @param image
-     * @return
-     * @throws IOException
-     */
-    private BufferedImage flipHorizontally(final BufferedImage image) throws IOException {
-        AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
-        tx = AffineTransform.getScaleInstance(-1, 1);
-        tx.translate(-image.getWidth(null), 0);
-        AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-        return op.filter(image, null);
-    }
-
-    /**
-     * Flips the image vertically (upside down).
-     * 
-     * @param image
-     * @return
-     * @throws IOException
-     */
-    private BufferedImage flipVertically(final BufferedImage image) throws IOException {
-        AffineTransform tx = AffineTransform.getScaleInstance(1, -1);
-        tx.translate(0, -image.getHeight(null));
-        AffineTransformOp op = new AffineTransformOp(tx, AffineTransformOp.TYPE_NEAREST_NEIGHBOR);
-        return op.filter(image, null);
-    }
-
-    /**
-     * 
-     * @param image
-     * @param rows
-     * @param cols
-     * @return
-     * @throws IOException
-     */
-    private BufferedImage puzzle(final BufferedImage image, final int cols, final int rows) throws IOException {
-        int chunks = rows * cols;
-        int count = 0;
-
-        // determines the chunk width and height
-        int chunkWidth = image.getWidth() / cols;
-        int chunkHeight = image.getHeight() / rows;
-
-        // Image array to hold image chunks
-        BufferedImage[] imageCells = new BufferedImage[chunks];
-        for (int x = 0; x < cols; x++) {
-            for (int y = 0; y < rows; y++) {
-                // Initialize the image array with image chunks
-                imageCells[count] = new BufferedImage(chunkWidth, chunkHeight, image.getType());
-
-                // draws the image chunk
-                Graphics2D gr = imageCells[count].createGraphics();
-                gr.drawImage(image, 0, 0, chunkWidth, chunkHeight, chunkWidth * x, chunkHeight * y, chunkWidth * x + chunkWidth, chunkHeight * y + chunkHeight, null);
-                gr.dispose();
-                count++;
-            }
-        }
-
-        // Randomize cells...
-        final long numberOfSwaps = (long) (count * (count / Math.PI));
-        for (int i = 0; i < numberOfSwaps; i++) {
-            int x1 = randInt(count - 1);
-            int x2 = randInt(count - 1);
-            BufferedImage temp = imageCells[x1];
-            imageCells[x1] = imageCells[x2];
-            imageCells[x2] = temp;
-        }
-
-        // Initializing the final image
-        BufferedImage finalImage = new BufferedImage(chunkWidth * cols, chunkHeight * rows, image.getType());
-        int num = 0;
-        for (int x = 0; x < cols; x++) {
-            for (int y = 0; y < rows; y++) {
-                finalImage.createGraphics().drawImage(imageCells[num++], chunkWidth * x, chunkHeight * y, null);
-            }
-        }
-
-        return finalImage;
     }
 
     /**
@@ -367,74 +207,23 @@ public class Launcher {
     }
 
     /**
-     * Checks the command line after the valid options. If not found, returns the default value.
+     * Check and gets an option value from the command line. If option are not found, returns the default value.
      * 
-     * @param validOptions the valid options for choosing option.
+     * @param options the options, valid once.
      * @param commandLine the commandLine
-     * @param defaultValue the default value
-     * @return the value from the valid option and if not found the default value.
+     * @param defaultValue the default value to return if any of the option(s) are not found.
+     * @return the option value, if not found, returns the defaultValue.
+     * @see #getOptionValue(String[], CommandLine)
      */
-    private String checkCommandLineForOption(final String[] validOptions, final CommandLine commandLine, final String defaultValue) {
-        String returnValue = checkCommandLineForOption(validOptions, commandLine);
-        return "".equals(returnValue) ? defaultValue : returnValue;
-    }
-
-    /**
-     * Checks the command line after options.
-     * 
-     * @param validOptions the valid options for the option.
-     * @param commandLine the commandLine
-     * @param delimiter the delimiter to use when splitting the potential values from the option on and from the commandLine.
-     * @return String array of values selected field(s) or null if not found in command line.
-     */
-    private String[] checkCommandLineForOptions(String[] validOptions, CommandLine commandLine, String delimiter) {
-        String[] returnValue = null;
-        String optionValue = checkCommandLineForOption(validOptions, commandLine, null);
-        if (optionValue != null) {
-            returnValue = optionValue.split(delimiter);
-        }
-        return returnValue;
-    }
-
-    /**
-     * Checks the command line after the valid options.
-     * 
-     * @param validOptions the valid options for choosing option.
-     * @param commandLine the commandLine
-     * @return the value from the valid option, if not found returns empty string "".
-     */
-    private String checkCommandLineForOption(String[] validOptions, CommandLine commandLine) {
-        String returnValue = "";
-        for (String option : validOptions) {
+    private String getOptionValue(final String[] options, final CommandLine commandLine, final String defaultValue) {
+        String returnValue = defaultValue;
+        for (String option : options) {
             if (commandLine.hasOption(option)) {
                 returnValue = commandLine.getOptionValue(option);
+                break;
             }
         }
         return returnValue;
-    }
-
-    /**
-     * Returns a pseudo-random number between min and max, inclusive. The difference between min and max can be at most <code>Integer.MAX_VALUE - 1</code>.
-     *
-     * @param min Minimum value
-     * @param max Maximum value. Must be greater than min.
-     * @return Integer between min and max, inclusive.
-     * @see java.util.Random#nextInt(int)
-     */
-    private int randInt(final int min, final int max) {
-        // nextInt is normally exclusive of the top value, so add 1 to make it inclusive
-        return rand.nextInt((max - min) + 1) + min;
-    }
-
-    /**
-     * Returns a pseudo-random number between zero (0) and max, inclusive. Parameter max can be at most <code>Integer.MAX_VALUE - 1</code>.
-     * 
-     * @param max Maximum value. Must be greater than zero (0).
-     * @return Integer between zero (0) and max, inclusive.
-     * @see #randInt(int, int)
-     */
-    private int randInt(final int max) {
-        return randInt(0, max);
     }
 
     /**
@@ -442,13 +231,6 @@ public class Launcher {
      */
     public String getApplication() {
         return application;
-    }
-
-    /**
-     * @return the properties
-     */
-    public Properties getProperties() {
-        return properties;
     }
 
 }
