@@ -15,14 +15,20 @@ public abstract class AbstractCliTest {
     protected final String separator = System.getProperty("line.separator");
 
     // @formatter:off
-    public final String gnu = "usage: java -jar image-scrambler.jar [-fh] [-fv] [-g] [-i <arg>] [-pz <arg>] [-v]" + separator 
+    public final String gnu = "usage: java -jar image-scrambler.jar [-c <arg>] [-d <arg>] [-fh] [-fv] [-g] [-o <arg>] [-p <arg>] [-pr] [-pz <arg>] [-r" + separator
+                + "       <arg>] [-v]" + separator
                 + "Help GNU" + separator
-                + "     -fh,--fliph          " + Constants.HELP_FLIP_HORIZONTALLY + separator
-                + "     -fv,--flipv          " + Constants.HELP_FLIP_VERTICALLY + separator
-                + "     -g,--gray            " + Constants.HELP_GRAY + separator
-                + "     -i,--image <arg>     " + Constants.HELP_IMAGE + separator
-                + "     -pz,--puzzle <arg>   " + Constants.HELP_PUZZLE + separator
-                + "     -v,--version         " + Constants.HELP_VERSION + separator
+                + "     -c,--columns <arg>     " + Constants.HELP_PUZZLE_COLUMNS + separator
+                + "     -d,--directory <arg>   " + Constants.HELP_DIRECTORY + separator
+                + "     -fh,--fliph            " + Constants.HELP_FLIP_HORIZONTALLY + separator
+                + "     -fv,--flipv            " + Constants.HELP_FLIP_VERTICALLY + separator
+                + "     -g,--gray              " + Constants.HELP_GRAY + separator
+                + "     -o,--output <arg>      " + Constants.HELP_OUTPUT_DIRECTORY + separator
+                + "     -p,--pattern <arg>     " + Constants.HELP_PATTERN + separator
+                + "     -pr,--prune            " + Constants.HELP_PRUNE + separator
+                + "     -pz,--puzzle <arg>     " + Constants.HELP_PUZZLE + separator
+                + "     -r,--rows <arg>        " + Constants.HELP_PUZZLE_ROWS + separator
+                + "     -v,--version           " + Constants.HELP_VERSION + separator
                 + "End of GNU Help" + separator;
     // @formatter:on
 

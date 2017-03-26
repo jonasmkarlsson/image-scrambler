@@ -6,7 +6,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
 import java.nio.file.FileSystems;
+import java.nio.file.FileVisitOption;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.EnumSet;
 import java.util.Properties;
 
 import javax.imageio.ImageIO;
@@ -85,14 +89,20 @@ public class Launcher {
      */
     private void useGnuParser(final CommandLine commandLine) throws IOException {
         // Find each parameter...
-        boolean image = commandLine.hasOption(Constants.OPTIONS_IMAGE[0]) || commandLine.hasOption(Constants.OPTIONS_IMAGE[1]);
+        boolean directory = commandLine.hasOption(Constants.OPTIONS_DIRECTORY[0]) || commandLine.hasOption(Constants.OPTIONS_DIRECTORY[1]);
         boolean flipV = commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_VERTICALLY[1]);
         boolean flipH = commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0]) || commandLine.hasOption(Constants.OPTIONS_FLIP_HORIZONTALLY[1]);
         boolean grey = commandLine.hasOption(Constants.OPTIONS_GREY[0]) || commandLine.hasOption(Constants.OPTIONS_GREY[1]);
+        boolean recursive = commandLine.hasOption(Constants.OPTIONS_RECURSIVE[0]) || commandLine.hasOption(Constants.OPTIONS_RECURSIVE[1]);
+        boolean pattern = commandLine.hasOption(Constants.OPTIONS_PATTERN[0]) || commandLine.hasOption(Constants.OPTIONS_PATTERN[1]);
         boolean puzzle = commandLine.hasOption(Constants.OPTIONS_PUZZLE[0]) || commandLine.hasOption(Constants.OPTIONS_PUZZLE[1]);
+        boolean prune = commandLine.hasOption(Constants.OPTIONS_PRUNE[0]) || commandLine.hasOption(Constants.OPTIONS_PRUNE[1]);
 
         int numberOfColumns = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
         int numberOfRows = Constants.DEFAULT_PUZZLE_COLUMNS_ROWS;
+
+        // Get and set options that are required
+        String outputDirectoryValue = getOptionValue(Constants.OPTIONS_OUTPUT_DIRECTORY, commandLine, Constants.DEFAULT_DIRECTORY);
 
         if (puzzle) {
             String defaultNumberOfColumnsAndRows = numberOfColumns + "," + numberOfRows;
@@ -102,18 +112,70 @@ public class Launcher {
             numberOfRows = Integer.valueOf(columnsAndRows[1]);
         }
 
-        Path path = FileSystems.getDefault().getPath(getOptionValue(Constants.OPTIONS_IMAGE, commandLine, ""));
-        if (image) {
-            LOGGER.info("Scrambling path: '" + path.toAbsolutePath() + "'");
-            BufferedImage scrambledImage = new Scramble().scramble(path, flipV, flipH, grey, puzzle, numberOfColumns, numberOfRows);
+        if (directory) {
+            String directoryValue = getOptionValue(Constants.OPTIONS_DIRECTORY, commandLine, Constants.DEFAULT_DIRECTORY);
+            String patternValue = getOptionValue(Constants.OPTIONS_PATTERN, commandLine, Constants.DEFAULT_DIRECTORY);
+            Path startingPath = Paths.get(directoryValue);
 
-            String ext = getExtension(path);
-            String name = createFileName(path, flipV, flipH, grey, puzzle) + "." + ext;
-            LOGGER.info("Saving scrambled file: '" + name + "'");
-            ImageIO.write(scrambledImage, ext, new File(name));
+            LOGGER.info("directoryValue: " + directoryValue);
+            LOGGER.info("patternValue: " + patternValue);
+            LOGGER.info("startingPath = '" + startingPath + "'");
+            LOGGER.info("recursive = '" + recursive + "'");
+            LOGGER.info("prune = '" + prune + "'");
+
+            FileFinder fileFinder = new FileFinder(patternValue, recursive);
+            if (prune) {
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Prune is set to '" + prune + "', FileWalker are follow links.");
+                }
+                EnumSet<FileVisitOption> opts = EnumSet.of(FileVisitOption.FOLLOW_LINKS);
+                Files.walkFileTree(startingPath, opts, Integer.MAX_VALUE, fileFinder);
+            } else {
+                if (LOGGER.isDebugEnabled()) {
+                    LOGGER.debug("Prune is set to '" + prune + "', FileWalker are not follow links.");
+                }
+                Files.walkFileTree(startingPath, fileFinder);
+            }
+
+            LOGGER.info("Found " + fileFinder.getMatchedFiles().size() + " file(s).");
+
+            for (Path path : fileFinder.getMatchedFiles()) {
+                scrambleAndSaveImage(path, outputDirectoryValue, flipV, flipH, grey, puzzle, numberOfColumns, numberOfRows);
+            }
+
+        } else if (pattern) {
+            Path path = FileSystems.getDefault().getPath(getOptionValue(Constants.OPTIONS_PATTERN, commandLine, ""));
+            scrambleAndSaveImage(path, outputDirectoryValue, flipV, flipH, grey, puzzle, numberOfColumns, numberOfRows);
         } else {
             printOutOptions(commandLine);
         }
+    }
+
+    private void scrambleAndSaveImage(final Path path, final String outputDir, final boolean flipV, final boolean flipH, final boolean grey,
+            final boolean puzzle, final int numberOfColumns, final int numberOfRows) throws IOException {
+        LOGGER.info("Scrambling path: '" + path.toAbsolutePath() + "'");
+
+        // TODO: Check that outputDir folder exists
+        File dir = new File(outputDir);
+
+        if (!dir.exists()) {
+            LOGGER.info("Creating directory: '" + dir.getName() + "'");
+            try {
+                dir.mkdir();
+                LOGGER.debug("Created directory '" + dir.getAbsolutePath() + "'.");
+            } catch (SecurityException se) {
+                LOGGER.error(
+                        "Encountered exception while trying to create directory '" + dir.getAbsolutePath() + "'. Some features might not work correctley.");
+                LOGGER.error("Exception: " + se);
+            }
+        }
+
+        BufferedImage scrambledImage = new Scramble().scramble(path, flipV, flipH, grey, puzzle, numberOfColumns, numberOfRows);
+        String ext = getExtension(path);
+        String name = createFileName(path, flipV, flipH, grey, puzzle) + "." + ext;
+        File scrambledFile = new File(outputDir + File.separator + name);
+        LOGGER.info("Saving scrambled path: '" + scrambledFile.getAbsolutePath() + "'");
+        ImageIO.write(scrambledImage, ext, scrambledFile);
     }
 
     private String createFileName(final Path path, final boolean flipV, final boolean flipH, final boolean grey, final boolean puzzle) {
@@ -177,11 +239,16 @@ public class Launcher {
      */
     private Options constructGnuOptions() {
         final Options gnuOptions = new Options();
+        gnuOptions.addOption(Constants.OPTIONS_DIRECTORY[0], Constants.OPTIONS_DIRECTORY[1], true, Constants.HELP_DIRECTORY);
         gnuOptions.addOption(Constants.OPTIONS_FLIP_VERTICALLY[0], Constants.OPTIONS_FLIP_VERTICALLY[1], false, Constants.HELP_FLIP_VERTICALLY);
         gnuOptions.addOption(Constants.OPTIONS_FLIP_HORIZONTALLY[0], Constants.OPTIONS_FLIP_HORIZONTALLY[1], false, Constants.HELP_FLIP_HORIZONTALLY);
         gnuOptions.addOption(Constants.OPTIONS_GREY[0], Constants.OPTIONS_GREY[1], false, Constants.HELP_GRAY);
-        gnuOptions.addOption(Constants.OPTIONS_IMAGE[0], Constants.OPTIONS_IMAGE[1], true, Constants.HELP_IMAGE);
+        gnuOptions.addOption(Constants.OPTIONS_OUTPUT_DIRECTORY[0], Constants.OPTIONS_OUTPUT_DIRECTORY[1], true, Constants.HELP_OUTPUT_DIRECTORY);
+        gnuOptions.addOption(Constants.OPTIONS_PATTERN[0], Constants.OPTIONS_PATTERN[1], true, Constants.HELP_PATTERN);
         gnuOptions.addOption(Constants.OPTIONS_PUZZLE[0], Constants.OPTIONS_PUZZLE[1], true, Constants.HELP_PUZZLE);
+        gnuOptions.addOption(Constants.OPTIONS_PUZZLE_COLUMNS[0], Constants.OPTIONS_PUZZLE_COLUMNS[1], true, Constants.HELP_PUZZLE_COLUMNS);
+        gnuOptions.addOption(Constants.OPTIONS_PUZZLE_ROWS[0], Constants.OPTIONS_PUZZLE_ROWS[1], true, Constants.HELP_PUZZLE_ROWS);
+        gnuOptions.addOption(Constants.OPTIONS_PRUNE[0], Constants.OPTIONS_PRUNE[1], false, Constants.HELP_PRUNE);
         gnuOptions.addOption(Constants.OPTIONS_VERSION[0], Constants.OPTIONS_VERSION[1], false, Constants.HELP_VERSION);
         return gnuOptions;
     }
@@ -207,7 +274,8 @@ public class Launcher {
     }
 
     /**
-     * Check and gets an option value from the command line. If option are not found, returns the default value.
+     * Check and gets an option value from the command line. If option are not found, returns the
+     * default value.
      * 
      * @param options the options, valid once.
      * @param commandLine the commandLine
