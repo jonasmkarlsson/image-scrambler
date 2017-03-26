@@ -70,22 +70,6 @@ public class FileFinder extends SimpleFileVisitor<Path> {
         }
     }
 
-    // /**
-    // * Invoke the pattern matching method on each directory.
-    // **/
-    // @Override
-    // public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
-    // // if (".".equals(dir.toString()) || searchSubFolders) {
-    // // find(dir);
-    //
-    // if (searchSubFolders) {
-    // // find(dir);
-    // return CONTINUE;
-    // } else {
-    // return SKIP_SUBTREE;
-    // }
-    // }
-
     /**
      * Check for cycle links.
      */
